@@ -1,0 +1,15 @@
+# Xcode user data
+*.xcuserstate
+xcuserdata/
+project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+project.xcworkspace/xcuserdata/
+
+# Build products
+build/
+DerivedData/
+
+# OS files
+.DS_Store
+
+# Claude worktrees
+.claude/worktrees/
