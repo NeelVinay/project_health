@@ -33,46 +33,36 @@ struct WeightTrendChart: View {
 
     var body: some View {
         Chart {
-            // Expected line (dashed)
+            // Expected line (dashed teal)
             ForEach(displayData) { point in
                 LineMark(
                     x: .value("Week", point.weekNumber),
-                    y: .value("Expected", displayWeight(point.expectedWeightKg))
+                    y: .value("Expected", displayWeight(point.expectedWeightKg)),
+                    series: .value("Series", "Expected")
                 )
-                .foregroundStyle(.teal.opacity(0.7))
+                .foregroundStyle(.teal)
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
                 .interpolationMethod(.catmullRom)
             }
 
-            // Actual line (solid)
+            // Actual line (solid blue)
             ForEach(displayData.filter { $0.actualWeightKg != nil }) { point in
                 LineMark(
                     x: .value("Week", point.weekNumber),
-                    y: .value("Actual", displayWeight(point.actualWeightKg!))
+                    y: .value("Actual", displayWeight(point.actualWeightKg!)),
+                    series: .value("Series", "Actual")
                 )
-                .foregroundStyle(pointColor(point))
+                .foregroundStyle(.blue)
                 .lineStyle(StrokeStyle(lineWidth: 2.5))
                 .interpolationMethod(.catmullRom)
                 .symbol {
                     Circle()
-                        .fill(pointColor(point))
+                        .fill(.blue)
                         .frame(width: 6, height: 6)
                 }
             }
 
-            // Area between expected and actual
-            ForEach(displayData.filter { $0.actualWeightKg != nil }) { point in
-                AreaMark(
-                    x: .value("Week", point.weekNumber),
-                    yStart: .value("Expected", displayWeight(point.expectedWeightKg)),
-                    yEnd: .value("Actual", displayWeight(point.actualWeightKg!))
-                )
-                .foregroundStyle(
-                    areaColor(point).opacity(0.1)
-                )
-            }
-
-            // Target weight line
+            // Goal target line (green dashed)
             RuleMark(y: .value("Target", displayTargetWeight))
                 .foregroundStyle(.green.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -83,34 +73,11 @@ struct WeightTrendChart: View {
                             .foregroundStyle(.green)
                     }
                 }
-
-            // Checkpoint markers
-            if !compact {
-                ForEach(displayData.filter { $0.isCheckpoint && $0.hasActualData }) { point in
-                    RuleMark(x: .value("Checkpoint", point.weekNumber))
-                        .foregroundStyle(.purple.opacity(0.3))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
-            }
         }
         .chartXAxisLabel(compact ? "" : "Week")
         .chartYAxisLabel(compact ? "" : (useMetric ? "kg" : "lbs"))
         .chartXAxis(compact ? .hidden : .automatic)
         .chartYAxis(compact ? .hidden : .automatic)
         .frame(height: compact ? 120 : 300)
-    }
-
-    private func pointColor(_ point: WeightProjectionPoint) -> Color {
-        guard let actual = point.actualWeightKg else { return .blue }
-        let diff = actual - point.expectedWeightKg
-        // For fat loss, being below expected is good
-        // For weight gain, being above expected is good
-        return abs(diff) < 0.5 ? .green : .orange
-    }
-
-    private func areaColor(_ point: WeightProjectionPoint) -> Color {
-        guard let actual = point.actualWeightKg else { return .clear }
-        let diff = actual - point.expectedWeightKg
-        return abs(diff) < 0.5 ? .green : .red
     }
 }

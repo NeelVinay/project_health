@@ -57,6 +57,8 @@ struct FitLockApp: App {
         if let goals = appState.goals {
             let notifications = NotificationManager()
             notifications.schedulePreLockWarning(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
+            // Schedule the goals-unmet notification at check time (repeats daily)
+            notifications.scheduleGoalsUnmetNotification(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
         }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @State private var refreshTimer: Timer?
+    @State private var midnightTimer: Timer?
 
     var body: some View {
         NavigationStack {
@@ -40,9 +41,12 @@ struct DashboardView: View {
             }
             .onAppear {
                 startPeriodicRefresh()
+                scheduleMidnightReset()
             }
             .onDisappear {
                 stopPeriodicRefresh()
+                midnightTimer?.invalidate()
+                midnightTimer = nil
             }
         }
     }
@@ -58,5 +62,25 @@ struct DashboardView: View {
     private func stopPeriodicRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
+    }
+
+    // MARK: - Midnight Reset Timer
+
+    private func scheduleMidnightReset() {
+        midnightTimer?.invalidate()
+
+        // Calculate seconds until next midnight
+        let calendar = Calendar.current
+        let now = Date()
+        guard let nextMidnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return }
+        let secondsUntilMidnight = nextMidnight.timeIntervalSince(now)
+
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: secondsUntilMidnight, repeats: false) { _ in
+            // Reset at midnight
+            appState.checkMidnightReset()
+            Task { await appState.evaluateGoals() }
+            // Schedule the next midnight reset
+            scheduleMidnightReset()
+        }
     }
 }

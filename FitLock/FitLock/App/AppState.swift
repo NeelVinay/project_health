@@ -131,7 +131,18 @@ final class AppState {
         if let lastCheck, !Calendar.current.isDate(lastCheck, inSameDayAs: now) {
             // New day — reset daily warning, keep weight warning
             goalChecker.handleMidnightReset()
-            dailyProgress = DailyProgress()
+
+            // Reset progress to zero for the new day
+            let stepsGoal = goals?.dailySteps ?? AppConstants.Defaults.dailySteps
+            let caloriesGoal = goals?.dailyCalories ?? AppConstants.Defaults.dailyCalories
+            dailyProgress = DailyProgress(
+                date: now,
+                currentSteps: 0,
+                currentCalories: 0,
+                stepsGoal: stepsGoal,
+                caloriesGoal: caloriesGoal,
+                isLocked: false
+            )
         }
 
         storage.lastCheckDate = now

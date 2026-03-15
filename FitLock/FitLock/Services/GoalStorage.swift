@@ -8,7 +8,9 @@ final class GoalStorage {
     private let decoder = JSONDecoder()
 
     init() {
-        self.defaults = UserDefaults(suiteName: AppConstants.appGroupID) ?? .standard
+        // Use .standard for free developer accounts (no App Groups capability)
+        // Switch to suiteName when upgrading to paid developer account
+        self.defaults = .standard
     }
 
     // MARK: - Onboarding

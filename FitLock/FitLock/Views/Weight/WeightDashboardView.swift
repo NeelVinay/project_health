@@ -2,9 +2,21 @@ import SwiftUI
 
 struct WeightDashboardView: View {
     @Environment(AppState.self) private var appState
+    @State private var weekLookupText: String = ""
+    @FocusState private var isLookupFocused: Bool
 
     private var useMetric: Bool {
         appState.profile?.useMetricUnits ?? true
+    }
+
+    private var lookupWeekNumber: Int? {
+        Int(weekLookupText)
+    }
+
+    private var lookupResult: WeightProjectionPoint? {
+        guard let profile = appState.profile, let week = lookupWeekNumber, week >= 1 else { return nil }
+        let projectionData = appState.weightManager.generateProjectionData(profile: profile)
+        return projectionData.first(where: { $0.weekNumber == week })
     }
 
     var body: some View {
@@ -15,6 +27,9 @@ struct WeightDashboardView: View {
                     if let profile = appState.profile {
                         quickStatsView(profile)
                     }
+
+                    // Week lookup
+                    weekLookupView()
 
                     // Full chart
                     ProjectionChartView()
@@ -54,6 +69,86 @@ struct WeightDashboardView: View {
             }
             .navigationTitle("Weight")
         }
+    }
+
+    // MARK: - Week Lookup
+
+    private func weekLookupView() -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Week Lookup", systemImage: "magnifyingglass")
+                .font(.headline)
+
+            HStack(spacing: 12) {
+                HStack {
+                    Text("Week")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    TextField("#", text: $weekLookupText)
+                        .keyboardType(.numberPad)
+                        .focused($isLookupFocused)
+                        .frame(width: 50)
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                if isLookupFocused {
+                    Button("Done") {
+                        isLookupFocused = false
+                    }
+                    .font(.subheadline.bold())
+                }
+            }
+
+            if let result = lookupResult {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Expected Weight")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(UnitConverter.weightString(result.expectedWeightKg, useMetric: useMetric))
+                            .font(.title3.bold())
+                            .foregroundStyle(.teal)
+                    }
+
+                    if let actual = result.actualWeightKg {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Actual Weight")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(UnitConverter.weightString(actual, useMetric: useMetric))
+                                .font(.title3.bold())
+                                .foregroundStyle(.blue)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Actual Weight")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("No data yet")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Date")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(result.date.shortDateString)
+                            .font(.caption)
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.top, 4)
+            } else if let week = lookupWeekNumber, week >= 1 {
+                Text("Week \(week) is beyond the projection range.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func quickStatsView(_ profile: UserProfile) -> some View {

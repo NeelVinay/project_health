@@ -85,8 +85,17 @@ final class GoalChecker {
         storage.isWeightLocked = weightWarnNeeded
 
         // If daily goals met at any point, clear daily warning
+        // and cancel the check time notification (they earned it!)
         if dailyGoalsMet {
             storage.isDailyLocked = false
+            let notifications = NotificationManager()
+            notifications.cancelGoalsUnmetNotification()
+        }
+
+        // If goals met, also send a congratulatory notification
+        if dailyGoalsMet && isPastCheckTime {
+            let notifications = NotificationManager()
+            notifications.sendGoalsAchieved()
         }
 
         return result
@@ -97,6 +106,11 @@ final class GoalChecker {
     func handleMidnightReset() {
         // Clear daily warning — weight warning persists
         storage.isDailyLocked = false
+
+        // Re-schedule the goals-unmet notification for the new day
+        let goals = storage.loadGoals() ?? FitLockGoals()
+        let notifications = NotificationManager()
+        notifications.scheduleGoalsUnmetNotification(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
     }
 
     // MARK: - First Day Check

@@ -28,27 +28,26 @@ struct ProjectionChartView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Selected week tooltip
+            // Tap a week to see details
             if let week = selectedWeek, let point = projectionData.first(where: { $0.weekNumber == week }) {
                 tooltipView(point)
             }
 
-            // Chart
+            // Chart — clean two-line view
             Chart {
-                // Expected line
+                // Expected line (dashed teal)
                 ForEach(projectionData) { point in
-                    let isFuture = point.weekNumber > currentWeekNumber
                     LineMark(
                         x: .value("Week", point.weekNumber),
                         y: .value("Expected", displayWeight(point.expectedWeightKg)),
                         series: .value("Series", "Expected")
                     )
-                    .foregroundStyle(.teal.opacity(isFuture ? 0.4 : 0.7))
+                    .foregroundStyle(.teal)
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
                     .interpolationMethod(.catmullRom)
                 }
 
-                // Actual line
+                // Actual line (solid blue)
                 ForEach(projectionData.filter { $0.actualWeightKg != nil }) { point in
                     LineMark(
                         x: .value("Week", point.weekNumber),
@@ -60,22 +59,12 @@ struct ProjectionChartView: View {
                     .interpolationMethod(.catmullRom)
                     .symbol {
                         Circle()
-                            .fill(pointColor(point))
-                            .frame(width: 8, height: 8)
+                            .fill(.blue)
+                            .frame(width: 7, height: 7)
                     }
                 }
 
-                // Area between
-                ForEach(projectionData.filter { $0.actualWeightKg != nil }) { point in
-                    AreaMark(
-                        x: .value("Week", point.weekNumber),
-                        yStart: .value("Expected", displayWeight(point.expectedWeightKg)),
-                        yEnd: .value("Actual", displayWeight(point.actualWeightKg!))
-                    )
-                    .foregroundStyle(areaColor(point).opacity(0.08))
-                }
-
-                // Target line
+                // Goal target line (green dashed)
                 RuleMark(y: .value("Target", displayWeight(targetWeight)))
                     .foregroundStyle(.green.opacity(0.5))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
@@ -84,37 +73,19 @@ struct ProjectionChartView: View {
                             .font(.caption2)
                             .foregroundStyle(.green)
                     }
-
-                // Today marker
-                RuleMark(x: .value("Today", currentWeekNumber))
-                    .foregroundStyle(.blue.opacity(0.3))
-                    .lineStyle(StrokeStyle(lineWidth: 1.5))
-                    .annotation(position: .top) {
-                        Text("Now")
-                            .font(.caption2)
-                            .foregroundStyle(.blue)
-                    }
-
-                // Checkpoint markers
-                ForEach(projectionData.filter { $0.isCheckpoint }) { point in
-                    RuleMark(x: .value("Checkpoint", point.weekNumber))
-                        .foregroundStyle(.purple.opacity(0.2))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                }
             }
             .chartXAxisLabel("Week")
             .chartYAxisLabel(useMetric ? "kg" : "lbs")
             .chartXSelection(value: $selectedWeek)
             .chartScrollableAxes(.horizontal)
-            .chartXVisibleDomain(length: 20) // Show 20 weeks at a time
-            .frame(height: 350)
+            .chartXVisibleDomain(length: 20)
+            .frame(height: 300)
 
             // Legend
-            HStack(spacing: 16) {
+            HStack(spacing: 20) {
                 legendItem(color: .teal, style: "dashed", label: "Expected")
                 legendItem(color: .blue, style: "solid", label: "Actual")
                 legendItem(color: .green, style: "dashed", label: "Goal")
-                legendItem(color: .purple, style: "dashed", label: "Checkpoint")
             }
             .font(.caption)
         }
@@ -153,11 +124,6 @@ struct ProjectionChartView: View {
                     }
                 }
             }
-            if point.isCheckpoint {
-                Label("Pace adjusted", systemImage: "flag.fill")
-                    .font(.caption)
-                    .foregroundStyle(.purple)
-            }
         }
         .padding()
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -178,17 +144,5 @@ struct ProjectionChartView: View {
             Text(label)
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private func pointColor(_ point: WeightProjectionPoint) -> Color {
-        guard let actual = point.actualWeightKg else { return .blue }
-        let diff = actual - point.expectedWeightKg
-        return abs(diff) < 0.5 ? .green : .orange
-    }
-
-    private func areaColor(_ point: WeightProjectionPoint) -> Color {
-        guard let actual = point.actualWeightKg else { return .clear }
-        let diff = actual - point.expectedWeightKg
-        return abs(diff) < 0.5 ? .green : .red
     }
 }

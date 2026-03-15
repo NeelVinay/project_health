@@ -124,6 +124,39 @@ final class NotificationManager {
         )
     }
 
+    // MARK: - Goals Unmet at Check Time (real iOS notification)
+
+    /// Schedule a daily repeating notification at check time.
+    /// This fires every day at check time as a reminder.
+    /// If goals are met before check time, we cancel it; if not, it fires.
+    func scheduleGoalsUnmetNotification(checkHour: Int, checkMinute: Int) {
+        // Remove any existing one first so we don't duplicate
+        cancelNotification(id: AppConstants.Notifications.goalsUnmetCheckTime)
+
+        let content = UNMutableNotificationContent()
+        content.title = "⚠️ Goals Not Met"
+        content.body = "You haven't hit your step and calorie goals today. In a future update, your social media apps will be blocked. Get moving!"
+        content.sound = .default
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = checkHour
+        dateComponents.minute = checkMinute
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(
+            identifier: AppConstants.Notifications.goalsUnmetCheckTime,
+            content: content,
+            trigger: trigger
+        )
+
+        center.add(request)
+    }
+
+    /// Cancel the goals unmet notification (call this when goals ARE met before check time)
+    func cancelGoalsUnmetNotification() {
+        cancelNotification(id: AppConstants.Notifications.goalsUnmetCheckTime)
+    }
+
     // MARK: - Re-Sign Reminder
 
     func scheduleResignReminder(installDate: Date) {

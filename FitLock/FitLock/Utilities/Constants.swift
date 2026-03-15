@@ -48,6 +48,7 @@ enum AppConstants {
         static let checkpoint = "fitlock.notification.checkpoint"
         static let resignReminder = "fitlock.notification.resign"
         static let weightEntryReminder = "fitlock.notification.weight.entry"
+        static let goalsUnmetCheckTime = "fitlock.notification.goals.unmet"
     }
 
 }

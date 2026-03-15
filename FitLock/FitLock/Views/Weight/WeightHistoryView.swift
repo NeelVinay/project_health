@@ -2,7 +2,7 @@ import SwiftUI
 
 struct WeightHistoryView: View {
     @Environment(AppState.self) private var appState
-    @State private var expandedWeek: Int?
+    @State private var collapsedWeeks: Set<Int> = []
 
     private var useMetric: Bool {
         appState.profile?.useMetricUnits ?? true
@@ -30,9 +30,9 @@ struct WeightHistoryView: View {
                     }
                 }
 
-                // Weekly records list
+                // Weekly records list (all daily entries visible by default)
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Weekly Records")
+                    Text("Weight History")
                         .font(.headline)
                         .padding(.horizontal)
 
@@ -56,11 +56,20 @@ struct WeightHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    private var isExpanded: Bool { true }
+
     private func weekRow(_ record: WeeklyWeightRecord) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let isCollapsed = collapsedWeeks.contains(record.weekNumber)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            // Week header (tap to collapse/expand)
             Button {
                 withAnimation {
-                    expandedWeek = expandedWeek == record.weekNumber ? nil : record.weekNumber
+                    if isCollapsed {
+                        collapsedWeeks.remove(record.weekNumber)
+                    } else {
+                        collapsedWeeks.insert(record.weekNumber)
+                    }
                 }
             } label: {
                 HStack {
@@ -75,9 +84,14 @@ struct WeightHistoryView: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(UnitConverter.weightString(record.averageWeightKg, useMetric: useMetric))
-                            .font(.headline.bold())
-                            .monospacedDigit()
+                        HStack(spacing: 4) {
+                            Text("Avg:")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(UnitConverter.weightString(record.averageWeightKg, useMetric: useMetric))
+                                .font(.headline.bold())
+                                .monospacedDigit()
+                        }
 
                         if let change = record.actualChangeKg {
                             HStack(spacing: 2) {
@@ -90,32 +104,40 @@ struct WeightHistoryView: View {
                         }
                     }
 
-                    // On track indicator
                     trackIndicator(record.onTrack)
 
-                    Image(systemName: expandedWeek == record.weekNumber ? "chevron.up" : "chevron.down")
+                    Image(systemName: isCollapsed ? "chevron.down" : "chevron.up")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .buttonStyle(.plain)
 
-            // Expanded: show daily weights
-            if expandedWeek == record.weekNumber {
-                ForEach(record.dailyWeights.sorted(by: { $0.date < $1.date })) { entry in
-                    HStack {
-                        Text(entry.date.shortDateString)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        Text(UnitConverter.weightString(entry.weightKg, useMetric: useMetric))
-                            .font(.caption.bold())
-                            .monospacedDigit()
-                        Image(systemName: entry.source == .healthKit ? "applewatch" : "hand.draw")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+            // Daily weights — shown by default (expanded)
+            if !isCollapsed {
+                if record.dailyWeights.isEmpty {
+                    Text("No entries this week")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading)
+                } else {
+                    Divider()
+
+                    ForEach(record.dailyWeights.sorted(by: { $0.date > $1.date })) { entry in
+                        HStack {
+                            Text(entry.date.shortDateString)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(UnitConverter.weightString(entry.weightKg, useMetric: useMetric))
+                                .font(.subheadline.bold())
+                                .monospacedDigit()
+                            Image(systemName: entry.source == .healthKit ? "applewatch" : "hand.draw")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 4)
                     }
-                    .padding(.leading)
                 }
             }
         }
