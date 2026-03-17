@@ -8,9 +8,12 @@ final class AppState {
     let healthKit: HealthKitManager
     let weightManager: WeightManager
     let goalChecker: GoalChecker
+    let bodyComposition: BodyCompositionManager
 
     // This is the observable flag that drives the UI transition
     var isOnboardingComplete: Bool = false
+
+    var selectedBodyMetric: BodyMetric?
 
     init() {
         let storage = GoalStorage()
@@ -21,10 +24,12 @@ final class AppState {
             weightManager: weightManager,
             storage: storage
         )
+        let bodyComposition = BodyCompositionManager(healthKit: healthKit, storage: storage)
         self.storage = storage
         self.healthKit = healthKit
         self.weightManager = weightManager
         self.goalChecker = goalChecker
+        self.bodyComposition = bodyComposition
         self.isOnboardingComplete = storage.isOnboardingCompleted
     }
 
@@ -62,6 +67,7 @@ final class AppState {
         profile = storage.loadProfile()
         goals = storage.loadGoals()
         weightManager.reload()
+        Task { await refreshBodyComposition() }
     }
 
     // MARK: - Save Helpers
@@ -95,6 +101,16 @@ final class AppState {
             caloriesGoal: caloriesGoal,
             isLocked: hasActiveWarning
         )
+
+        // Refresh body composition data
+        await bodyComposition.refresh()
+    }
+
+    // MARK: - Body Composition
+
+    func refreshBodyComposition() async {
+        await bodyComposition.refresh()
+        await bodyComposition.refreshHistory()
     }
 
     // MARK: - Goal Evaluation
@@ -129,8 +145,14 @@ final class AppState {
         let now = Date()
 
         if let lastCheck, !Calendar.current.isDate(lastCheck, inSameDayAs: now) {
-            // New day — reset daily warning, keep weight warning
-            goalChecker.handleMidnightReset()
+            // New day detected — evaluate yesterday's goals before resetting
+            let yesterdaySteps = dailyProgress.currentSteps
+            let yesterdayCalories = dailyProgress.currentCalories
+
+            // Don't evaluate on first day
+            if !goalChecker.isFirstDay() {
+                goalChecker.handleMidnightReset(yesterdaySteps: yesterdaySteps, yesterdayCalories: yesterdayCalories)
+            }
 
             // Reset progress to zero for the new day
             let stepsGoal = goals?.dailySteps ?? AppConstants.Defaults.dailySteps

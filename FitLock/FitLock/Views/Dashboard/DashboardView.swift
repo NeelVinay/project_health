@@ -8,15 +8,18 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    // Lock status banner
+                VStack(spacing: 20) {
+                    // Greeting header
+                    DashboardHeaderView()
+
+                    // Status banner (subtle)
                     LockStatusBanner()
 
-                    // Activity progress
+                    // Activity progress (larger rings)
                     ActivityProgressView()
 
-                    // Weight progress
-                    WeightProgressView()
+                    // Body metrics snapshot (2x2)
+                    BodySnapshotView()
 
                     // Quick action: Log Weight
                     NavigationLink(destination: WeightEntryView()) {
@@ -24,20 +27,23 @@ struct DashboardView: View {
                             Image(systemName: "plus.circle.fill")
                             Text("Log Weight")
                         }
+                        .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(.blue)
+                        .background(Color.blue, in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.white)
                     }
                 }
                 .padding()
             }
-            .navigationTitle("FitLock")
+            .background(Color(.systemGroupedBackground))
             .refreshable {
                 await appState.evaluateGoals()
+                await appState.refreshBodyComposition()
             }
             .task {
                 await appState.evaluateGoals()
+                await appState.refreshBodyComposition()
             }
             .onAppear {
                 startPeriodicRefresh()
@@ -51,7 +57,7 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Periodic Refresh (every 5 minutes in foreground)
+    // MARK: - Periodic Refresh (every 5 minutes)
 
     private func startPeriodicRefresh() {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
@@ -68,18 +74,14 @@ struct DashboardView: View {
 
     private func scheduleMidnightReset() {
         midnightTimer?.invalidate()
-
-        // Calculate seconds until next midnight
         let calendar = Calendar.current
         let now = Date()
         guard let nextMidnight = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) else { return }
         let secondsUntilMidnight = nextMidnight.timeIntervalSince(now)
 
         midnightTimer = Timer.scheduledTimer(withTimeInterval: secondsUntilMidnight, repeats: false) { _ in
-            // Reset at midnight
             appState.checkMidnightReset()
             Task { await appState.evaluateGoals() }
-            // Schedule the next midnight reset
             scheduleMidnightReset()
         }
     }

@@ -21,8 +21,6 @@ enum AppConstants {
     enum Defaults {
         static let dailySteps = 10_000
         static let dailyCalories: Double = 550.0
-        static let checkTimeHour = 21 // 9 PM
-        static let checkTimeMinute = 0
         static let waterWeightTolerance = 0.3 // kg
         static let consecutiveOffTrackWeeksToLock = 2
         static let baselineWeeks = 2 // no locking during first 2 weeks

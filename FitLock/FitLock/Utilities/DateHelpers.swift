@@ -59,6 +59,17 @@ extension Date {
         return now >= checkTime
     }
 
+    /// Human-readable time ago string
+    var timeAgoString: String {
+        let interval = Date().timeIntervalSince(self)
+        if interval < 60 { return "Just now" }
+        if interval < 3600 { return "\(Int(interval / 60))m ago" }
+        if interval < 86400 { return "\(Int(interval / 3600))h ago" }
+        let days = Int(interval / 86400)
+        if days == 1 { return "Yesterday" }
+        return "\(days)d ago"
+    }
+
     /// Format as short date string
     var shortDateString: String {
         let formatter = DateFormatter()

@@ -17,7 +17,6 @@ final class GoalChecker {
 
     struct EvaluationResult {
         var dailyGoalsMet: Bool
-        var isPastCheckTime: Bool
         var weightOnTrack: Bool
         var shouldWarn: Bool
         var warnReason: WarnReason?
@@ -32,7 +31,6 @@ final class GoalChecker {
     // MARK: - Full Evaluation
 
     func evaluate() async -> EvaluationResult {
-        // Refresh health data
         await healthKit.refreshAll()
 
         let goals = storage.loadGoals() ?? FitLockGoals()
@@ -43,10 +41,7 @@ final class GoalChecker {
         let caloriesGoalMet = healthKit.todayCalories >= goals.dailyCalories
         let dailyGoalsMet = stepsGoalMet && caloriesGoalMet
 
-        // Check time
-        let isPastCheckTime = Date.isPastTime(hour: goals.checkTimeHour, minute: goals.checkTimeMinute)
-
-        // Check weight (only if we're past the baseline period)
+        // Check weight (only if past baseline period)
         let weightOffTrack: Bool
         if let profile, profile.currentWeekNumber > AppConstants.Defaults.baselineWeeks {
             weightOffTrack = weightManager.shouldLockForWeight()
@@ -54,15 +49,15 @@ final class GoalChecker {
             weightOffTrack = false
         }
 
-        // Determine warning state (no blocking in tracker-only mode)
-        let dailyWarnNeeded = isPastCheckTime && !dailyGoalsMet
+        // Warning state is based on yesterday's unmet goals (persisted in isDailyLocked)
+        // or current weight being off track
         let weightWarnNeeded = weightOffTrack
-        let shouldWarn = dailyWarnNeeded || weightWarnNeeded
+        let shouldWarn = storage.isDailyLocked || weightWarnNeeded
 
         let warnReason: WarnReason?
-        if dailyWarnNeeded && weightWarnNeeded {
+        if storage.isDailyLocked && weightWarnNeeded {
             warnReason = .both
-        } else if dailyWarnNeeded {
+        } else if storage.isDailyLocked {
             warnReason = .dailyGoalsUnmet
         } else if weightWarnNeeded {
             warnReason = .weightOffTrack
@@ -72,30 +67,17 @@ final class GoalChecker {
 
         let result = EvaluationResult(
             dailyGoalsMet: dailyGoalsMet,
-            isPastCheckTime: isPastCheckTime,
             weightOnTrack: !weightOffTrack,
             shouldWarn: shouldWarn,
             warnReason: warnReason
         )
 
         lastEvaluationResult = result
-
-        // Update storage state
-        storage.isDailyLocked = isPastCheckTime && !dailyGoalsMet
         storage.isWeightLocked = weightWarnNeeded
 
-        // If daily goals met at any point, clear daily warning
-        // and cancel the check time notification (they earned it!)
+        // If daily goals met today, clear any daily warning from yesterday
         if dailyGoalsMet {
             storage.isDailyLocked = false
-            let notifications = NotificationManager()
-            notifications.cancelGoalsUnmetNotification()
-        }
-
-        // If goals met, also send a congratulatory notification
-        if dailyGoalsMet && isPastCheckTime {
-            let notifications = NotificationManager()
-            notifications.sendGoalsAchieved()
         }
 
         return result
@@ -103,14 +85,22 @@ final class GoalChecker {
 
     // MARK: - Midnight Reset
 
-    func handleMidnightReset() {
-        // Clear daily warning — weight warning persists
-        storage.isDailyLocked = false
-
-        // Re-schedule the goals-unmet notification for the new day
+    /// Called at midnight (or when app opens after midnight on a new day).
+    /// Evaluates whether yesterday's goals were met, sends notification if not, then resets for the new day.
+    func handleMidnightReset(yesterdaySteps: Int, yesterdayCalories: Double) {
         let goals = storage.loadGoals() ?? FitLockGoals()
+        let yesterdayMet = yesterdaySteps >= goals.dailySteps && yesterdayCalories >= goals.dailyCalories
+
         let notifications = NotificationManager()
-        notifications.scheduleGoalsUnmetNotification(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
+
+        if !yesterdayMet {
+            // Goals were NOT met yesterday — send notification and set daily warning
+            storage.isDailyLocked = true
+            notifications.sendGoalsUnmetAtMidnight()
+        } else {
+            // Goals were met — clear any daily warning
+            storage.isDailyLocked = false
+        }
     }
 
     // MARK: - First Day Check

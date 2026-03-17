@@ -48,21 +48,19 @@ final class NotificationManager {
         center.add(request)
     }
 
-    func schedulePreLockWarning(checkHour: Int, checkMinute: Int) {
+    /// Schedule a daily warning at 11 PM (23:00) — 1 hour before midnight.
+    func schedulePreMidnightWarning() {
+        // Remove any existing one first so we don't duplicate
+        cancelNotification(id: AppConstants.Notifications.preLockWarning)
+
         let content = UNMutableNotificationContent()
-        content.title = "1 Hour Until Check Time"
-        content.body = "Check time is at \(formatTime(hour: checkHour, minute: checkMinute)). Keep moving to hit your goals!"
+        content.title = "1 Hour Until Midnight"
+        content.body = "1 hour until midnight! Keep moving to hit your goals before the day ends."
         content.sound = .default
 
-        // 1 hour before check time
         var dateComponents = DateComponents()
-        if checkHour > 0 {
-            dateComponents.hour = checkHour - 1
-            dateComponents.minute = checkMinute
-        } else {
-            dateComponents.hour = 23
-            dateComponents.minute = checkMinute
-        }
+        dateComponents.hour = 23
+        dateComponents.minute = 0
 
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
         let request = UNNotificationRequest(
@@ -75,6 +73,15 @@ final class NotificationManager {
     }
 
     // MARK: - Immediate Notifications
+
+    /// Fires immediately when midnight reset detects yesterday's goals were not met.
+    func sendGoalsUnmetAtMidnight() {
+        sendImmediate(
+            id: AppConstants.Notifications.goalsUnmetCheckTime,
+            title: "Goals Not Met",
+            body: "You didn't meet your goals today. In future updates, social media will be blocked."
+        )
+    }
 
     func sendLockActivated() {
         sendImmediate(
@@ -124,33 +131,7 @@ final class NotificationManager {
         )
     }
 
-    // MARK: - Goals Unmet at Check Time (real iOS notification)
-
-    /// Schedule a daily repeating notification at check time.
-    /// This fires every day at check time as a reminder.
-    /// If goals are met before check time, we cancel it; if not, it fires.
-    func scheduleGoalsUnmetNotification(checkHour: Int, checkMinute: Int) {
-        // Remove any existing one first so we don't duplicate
-        cancelNotification(id: AppConstants.Notifications.goalsUnmetCheckTime)
-
-        let content = UNMutableNotificationContent()
-        content.title = "⚠️ Goals Not Met"
-        content.body = "You haven't hit your step and calorie goals today. In a future update, your social media apps will be blocked. Get moving!"
-        content.sound = .default
-
-        var dateComponents = DateComponents()
-        dateComponents.hour = checkHour
-        dateComponents.minute = checkMinute
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(
-            identifier: AppConstants.Notifications.goalsUnmetCheckTime,
-            content: content,
-            trigger: trigger
-        )
-
-        center.add(request)
-    }
+    // MARK: - Cancel
 
     /// Cancel the goals unmet notification (call this when goals ARE met before check time)
     func cancelGoalsUnmetNotification() {
@@ -200,11 +181,5 @@ final class NotificationManager {
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
 
         center.add(request)
-    }
-
-    private func formatTime(hour: Int, minute: Int) -> String {
-        let h = hour % 12 == 0 ? 12 : hour % 12
-        let period = hour < 12 ? "AM" : "PM"
-        return String(format: "%d:%02d %@", h, minute, period)
     }
 }

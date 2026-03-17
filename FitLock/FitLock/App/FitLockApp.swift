@@ -37,29 +37,22 @@ struct FitLockApp: App {
         appState.storage.setInstallDateIfNeeded()
         appState.loadAll()
 
-        // Set up HealthKit observer queries for background updates
         appState.healthKit.setupObserverQueries {
             Task { await appState.evaluateGoals() }
         }
 
-        // Enable background delivery
         Task {
             await appState.healthKit.enableBackgroundDelivery()
         }
 
-        // Schedule re-sign reminder
         if let installDate = appState.storage.installDate {
             let notifications = NotificationManager()
             notifications.scheduleResignReminder(installDate: installDate)
         }
 
-        // Schedule daily notifications
-        if let goals = appState.goals {
-            let notifications = NotificationManager()
-            notifications.schedulePreLockWarning(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
-            // Schedule the goals-unmet notification at check time (repeats daily)
-            notifications.scheduleGoalsUnmetNotification(checkHour: goals.checkTimeHour, checkMinute: goals.checkTimeMinute)
-        }
+        // Schedule the daily 11 PM warning (always at 23:00)
+        let notifications = NotificationManager()
+        notifications.schedulePreMidnightWarning()
     }
 }
 
@@ -80,22 +73,27 @@ struct ContentView: View {
 // MARK: - Main Tab View
 
 struct MainTabView: View {
+    @State private var selectedTab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "heart.circle.fill")
                 }
+                .tag(0)
 
-            WeightDashboardView()
+            BodyDashboardView()
                 .tabItem {
-                    Label("Weight", systemImage: "scalemass.fill")
+                    Label("Body", systemImage: "figure.arms.open")
                 }
+                .tag(1)
 
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
+                .tag(2)
         }
     }
 }

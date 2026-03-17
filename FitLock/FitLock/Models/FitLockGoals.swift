@@ -1,18 +1,22 @@
 import Foundation
 
 struct FitLockGoals: Codable, Equatable {
-    // Daily activity goals
     var dailySteps: Int = AppConstants.Defaults.dailySteps
     var dailyCalories: Double = AppConstants.Defaults.dailyCalories
-    var checkTimeHour: Int = AppConstants.Defaults.checkTimeHour
-    var checkTimeMinute: Int = AppConstants.Defaults.checkTimeMinute
 
-    var checkTimeString: String {
-        let hour = checkTimeHour % 12 == 0 ? 12 : checkTimeHour % 12
-        let period = checkTimeHour < 12 ? "AM" : "PM"
-        if checkTimeMinute == 0 {
-            return "\(hour):00 \(period)"
-        }
-        return String(format: "%d:%02d %@", hour, checkTimeMinute, period)
+    // Custom decoder to handle migration from old format that had checkTimeHour/checkTimeMinute
+    init(dailySteps: Int = AppConstants.Defaults.dailySteps, dailyCalories: Double = AppConstants.Defaults.dailyCalories) {
+        self.dailySteps = dailySteps
+        self.dailyCalories = dailyCalories
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case dailySteps, dailyCalories
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dailySteps = try container.decodeIfPresent(Int.self, forKey: .dailySteps) ?? AppConstants.Defaults.dailySteps
+        dailyCalories = try container.decodeIfPresent(Double.self, forKey: .dailyCalories) ?? AppConstants.Defaults.dailyCalories
     }
 }

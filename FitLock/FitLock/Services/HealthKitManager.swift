@@ -10,6 +10,9 @@ final class HealthKitManager {
     var todaySteps: Int = 0
     var todayCalories: Double = 0.0
     var authorizationError: String?
+    var latestBodyFat: Double?
+    var latestLeanBodyMass: Double?
+    var latestBMI: Double?
 
     private var observerQueries: [HKObserverQuery] = []
 
@@ -18,9 +21,12 @@ final class HealthKitManager {
     private let stepType = HKQuantityType(.stepCount)
     private let calorieType = HKQuantityType(.activeEnergyBurned)
     private let weightType = HKQuantityType(.bodyMass)
+    private let bodyFatType = HKQuantityType(.bodyFatPercentage)
+    private let leanBodyMassType = HKQuantityType(.leanBodyMass)
+    private let bmiType = HKQuantityType(.bodyMassIndex)
 
     private var readTypes: Set<HKObjectType> {
-        [stepType, calorieType, weightType]
+        [stepType, calorieType, weightType, bodyFatType, leanBodyMassType, bmiType]
     }
 
     // MARK: - Authorization
@@ -140,10 +146,98 @@ final class HealthKitManager {
         return avgSteps
     }
 
+    // MARK: - Fetch Latest Body Fat Percentage
+
+    func fetchLatestBodyFat() async -> Double? {
+        await fetchLatestSample(type: bodyFatType, unit: .percent())
+    }
+
+    // MARK: - Fetch Latest Lean Body Mass
+
+    func fetchLatestLeanBodyMass() async -> Double? {
+        await fetchLatestSample(type: leanBodyMassType, unit: .gramUnit(with: .kilo))
+    }
+
+    // MARK: - Fetch Latest BMI
+
+    func fetchLatestBMI() async -> Double? {
+        await fetchLatestSample(type: bmiType, unit: .count())
+    }
+
+    // MARK: - History Fetchers for Body Composition Charts
+
+    func fetchWeightHistory(days: Int = 30) async -> [BodyMetricSample] {
+        await fetchSampleHistory(type: weightType, unit: .gramUnit(with: .kilo), days: days)
+    }
+
+    func fetchBodyFatHistory(days: Int = 30) async -> [BodyMetricSample] {
+        await fetchSampleHistory(type: bodyFatType, unit: .percent(), days: days)
+    }
+
+    func fetchLeanBodyMassHistory(days: Int = 30) async -> [BodyMetricSample] {
+        await fetchSampleHistory(type: leanBodyMassType, unit: .gramUnit(with: .kilo), days: days)
+    }
+
+    func fetchBMIHistory(days: Int = 30) async -> [BodyMetricSample] {
+        await fetchSampleHistory(type: bmiType, unit: .count(), days: days)
+    }
+
+    // MARK: - Generic Latest Sample Fetcher
+
+    private func fetchLatestSample(type: HKQuantityType, unit: HKUnit) async -> Double? {
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                guard error == nil, let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                continuation.resume(returning: sample.quantity.doubleValue(for: unit))
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    // MARK: - Generic Sample History Fetcher
+
+    private func fetchSampleHistory(type: HKQuantityType, unit: HKUnit, days: Int) async -> [BodyMetricSample] {
+        let startDate = Date().daysAgo(days)
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: Date(), options: .strictStartDate)
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+
+        return await withCheckedContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                guard error == nil, let quantitySamples = samples as? [HKQuantitySample] else {
+                    continuation.resume(returning: [])
+                    return
+                }
+                let result = quantitySamples.map { sample in
+                    BodyMetricSample(
+                        date: sample.startDate,
+                        value: sample.quantity.doubleValue(for: unit)
+                    )
+                }
+                continuation.resume(returning: result)
+            }
+            healthStore.execute(query)
+        }
+    }
+
     // MARK: - Observer Queries for Background Updates
 
     func setupObserverQueries(onUpdate: @escaping () -> Void) {
-        let types: [HKQuantityType] = [stepType, calorieType]
+        let types: [HKQuantityType] = [stepType, calorieType, weightType, bodyFatType, leanBodyMassType, bmiType]
 
         for type in types {
             let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completionHandler, error in
@@ -160,7 +254,7 @@ final class HealthKitManager {
     }
 
     func enableBackgroundDelivery() async {
-        let types: [HKQuantityType] = [stepType, calorieType]
+        let types: [HKQuantityType] = [stepType, calorieType, weightType, bodyFatType, leanBodyMassType, bmiType]
 
         for type in types {
             do {
